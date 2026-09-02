@@ -1,0 +1,27 @@
+name: mirror-source
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror all branches+tags from burner1
+        env:
+          SRC_TOKEN: ${{ secrets.SRC_TOKEN }}
+        run: |
+          git clone --bare "https://x-access-token:$SRC_TOKEN@github.com/balsicl1234/9router.git" /tmp/mirror
+          cd /tmp/mirror
+          git for-each-ref --format='%(refname)' | grep 'refs/heads/dependabot' | while read r; do git update-ref -d "$r"; done
+          git clone -q "https://x-access-token:${{ github.token }}@github.com/balsickass/9router-backup.git" /tmp/dst
+          cd /tmp/dst
+          git remote add up /tmp/mirror
+          git fetch up '+refs/heads/*:refs/remotes/up/*' '+refs/tags/*:refs/tags/*'
+          git push origin "+refs/remotes/up/heads/develop:refs/heads/develop" || true
+          # push every non-main branch + all tags
+          git for-each-ref --format='%(refname)' --refs/remotes/up | sed 's|refs/remotes/up/||' | grep -v '^HEAD$' | while read b; do
+            git push origin "+refs/remotes/up/$b:refs/heads/$b" --force
+          done
+          git push origin --tags --force
+          echo "mirror complete"
