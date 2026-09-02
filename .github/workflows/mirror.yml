@@ -3,37 +3,33 @@ on:
   workflow_dispatch:
     inputs:
       src_repo:
-        description: "source repo to mirror (owner/name)"
+        description: "source repo (owner/name)"
         required: true
         default: "balsicl1234/hermes-cloud"
       dst_repo:
         description: "destination repo (owner/name)"
         required: true
         default: "balsickass/hermes-cloud-backup"
-      branches:
-        description: "branch glob (empty = all heads)"
-        required: false
-        default: ""
 permissions:
   contents: write
 jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror branches source -> destination
+      - name: Mirror all branches source to destination
         run: |
           SRC="${{ github.event.inputs.src_repo }}"
           DST="${{ github.event.inputs.dst_repo }}"
           PAT="${{ secrets.SRC_TOKEN }}"
-          ok=0; fail=0
+          ok=0
+          fail=0
           for b in $(git ls-remote --heads "https://github.com/$SRC.git" | awk '{print $2}' | sed 's|refs/heads/||'); do
-            if [ -n "${{ github.event.inputs.branches }}" ]; then
-              case "$b" in ${{ github.event.inputs.branches }}) ;; *) continue;; esac
-            fi
             if git push "https://x-access-token:$PAT@github.com/$DST.git" "+refs/heads/$b:refs/heads/$b" --force >/dev/null 2>&1; then
-              echo "pushed $b"; ok=$((ok+1))
+              echo "pushed $b"
+              ok=$((ok+1))
             else
-              echo "SKIP $b"; fail=$((fail+1))
+              echo "SKIP $b"
+              fail=$((fail+1))
             fi
           done
           echo "RESULT pushed=$ok skipped=$fail"
