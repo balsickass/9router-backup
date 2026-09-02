@@ -7,20 +7,12 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror all branches (anon clone public src, PAT push dst)
-        env:
-          DST_TOKEN: ${{ secrets.SRC_TOKEN }}
+      - name: Snapshot master as clean single commit (master-snapshot)
         run: |
-          git clone --bare "https://github.com/balsicl1234/9router.git" /tmp/mirror
-          cd /tmp/mirror
-          git for-each-ref --format='%(refname)' | grep 'refs/heads/dependabot' | while read r; do git update-ref -d "$r"; done
-          ok=0; fail=0
-          for b in $(git for-each-ref --format='%(refname:short)' refs/heads); do
-            if git push "https://x-access-token:$DST_TOKEN@github.com/balsickass/9router-backup.git" "+refs/heads/$b:refs/heads/$b" --force >/dev/null 2>&1; then
-              echo "pushed $b"; ok=$((ok+1))
-            else
-              echo "SKIP $b"; fail=$((fail+1))
-            fi
-          done
-          echo "RESULT pushed=$ok skipped=$fail"
-          git ls-remote "https://x-access-token:$DST_TOKEN@github.com/balsickass/9router-backup.git" | grep refs/heads
+          git clone --depth 1 "https://github.com/balsicl1234/9router.git" /tmp/src -b master
+          cd /tmp/src
+          git checkout --orphan master-snapshot
+          git add -A
+          git -c user.email=backup@balsickass.local -c user.name=backup-bot commit -qm "clean snapshot of balsicl1234/9router master (history dropped: push-protection)"
+          git push "https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/balsickass/9router-backup.git" "+master-snapshot:refs/heads/master-snapshot" --force
+          echo "snapshot pushed"
