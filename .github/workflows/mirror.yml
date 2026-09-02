@@ -7,20 +7,11 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror branches from source
+      - name: Mirror master with verbose errors
         env:
           SRC_TOKEN: ${{ secrets.SRC_TOKEN }}
         run: |
           git clone --bare "https://x-access-token:$SRC_TOKEN@github.com/balsicl1234/9router.git" /tmp/mirror
           cd /tmp/mirror
-          git for-each-ref --format='%(refname)' | grep 'refs/heads/dependabot' | while read r; do git update-ref -d "$r"; done
-          ok=0; fail=0
-          for b in $(git for-each-ref --format='%(refname:short)' refs/heads); do
-            if git push "https://x-access-token:${{ github.token }}@github.com/balsickass/9router-backup.git" "+refs/heads/$b:refs/heads/$b" --force >/dev/null 2>&1; then
-              echo "pushed $b"; ok=$((ok+1))
-            else
-              echo "SKIP $b (push protection or rule)"; fail=$((fail+1))
-            fi
-          done
-          echo "branches pushed: $ok, skipped: $fail"
-          git ls-remote "https://x-access-token:${{ github.token }}@github.com/balsickass/9router-backup.git" | grep refs/heads | head -10
+          git push "https://x-access-token:${{ github.token }}@github.com/balsickass/9router-backup.git" "+refs/heads/master:refs/heads/master" --force 2>&1 | tail -20
+          echo "exit: $?"
