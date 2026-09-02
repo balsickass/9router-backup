@@ -16,15 +16,20 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror all branches, VERBOSE
+      - name: Mirror all branches (init git dir first)
         run: |
           SRC="${{ github.event.inputs.src_repo }}"
           DST="${{ github.event.inputs.dst_repo }}"
           PAT="${{ secrets.SRC_TOKEN }}"
-          echo "test auth to DST:"
-          git ls-remote "https://x-access-token:$PAT@github.com/$DST.git" HEAD 2>&1 | head -3
-          echo "---"
+          git init -q /tmp/work
+          cd /tmp/work
           for b in $(git ls-remote --heads "https://github.com/$SRC.git" | awk '{print $2}' | sed 's|refs/heads/||'); do
-            echo "=== pushing $b (verbose):"
-            git push "https://x-access-token:$PAT@github.com/$DST.git" "+refs/heads/$b:refs/heads/$b" --force 2>&1 | grep -vE "remote:|Receiving|Resolving|Counting|Compressing|Writing" | head -5
+            git fetch "https://github.com/$SRC.git" "+refs/heads/$b:refs/remotes/src/$b" >/dev/null 2>&1
+            if git push "https://x-access-token:$PAT@github.com/$DST.git" "+refs/remotes/src/$b:refs/heads/$b" --force >/dev/null 2>&1; then
+              echo "pushed $b"
+            else
+              echo "SKIP $b"
+            fi
           done
+          echo "verify:"
+          git ls-remote "https://x-access-token:$PAT@github.com/$DST.git" | grep refs/heads
