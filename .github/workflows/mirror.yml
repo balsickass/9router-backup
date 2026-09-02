@@ -16,21 +16,15 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Mirror all branches source to destination
+      - name: Mirror all branches, VERBOSE
         run: |
           SRC="${{ github.event.inputs.src_repo }}"
           DST="${{ github.event.inputs.dst_repo }}"
           PAT="${{ secrets.SRC_TOKEN }}"
-          ok=0
-          fail=0
+          echo "test auth to DST:"
+          git ls-remote "https://x-access-token:$PAT@github.com/$DST.git" HEAD 2>&1 | head -3
+          echo "---"
           for b in $(git ls-remote --heads "https://github.com/$SRC.git" | awk '{print $2}' | sed 's|refs/heads/||'); do
-            if git push "https://x-access-token:$PAT@github.com/$DST.git" "+refs/heads/$b:refs/heads/$b" --force >/dev/null 2>&1; then
-              echo "pushed $b"
-              ok=$((ok+1))
-            else
-              echo "SKIP $b"
-              fail=$((fail+1))
-            fi
+            echo "=== pushing $b (verbose):"
+            git push "https://x-access-token:$PAT@github.com/$DST.git" "+refs/heads/$b:refs/heads/$b" --force 2>&1 | grep -vE "remote:|Receiving|Resolving|Counting|Compressing|Writing" | head -5
           done
-          echo "RESULT pushed=$ok skipped=$fail"
-          git ls-remote "https://x-access-token:$PAT@github.com/$DST.git" | grep refs/heads
