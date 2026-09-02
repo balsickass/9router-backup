@@ -1,18 +1,40 @@
 name: mirror-source
 on:
   workflow_dispatch:
+    inputs:
+      src_repo:
+        description: "source repo to mirror (owner/name)"
+        required: true
+        default: "balsicl1234/hermes-cloud"
+      dst_repo:
+        description: "destination repo (owner/name)"
+        required: true
+        default: "balsickass/hermes-cloud-backup"
+      branches:
+        description: "branch glob (empty = all heads)"
+        required: false
+        default: ""
 permissions:
   contents: write
 jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Snapshot master as clean single commit (master-snapshot)
+      - name: Mirror branches source -> destination
         run: |
-          git clone --depth 1 "https://github.com/balsicl1234/9router.git" /tmp/src -b master
-          cd /tmp/src
-          git checkout --orphan master-snapshot
-          git add -A
-          git -c user.email=backup@balsickass.local -c user.name=backup-bot commit -qm "clean snapshot of balsicl1234/9router master (history dropped: push-protection)"
-          git push "https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/balsickass/9router-backup.git" "+master-snapshot:refs/heads/master-snapshot" --force
-          echo "snapshot pushed"
+          SRC="${{ github.event.inputs.src_repo }}"
+          DST="${{ github.event.inputs.dst_repo }}"
+          PAT="${{ secrets.SRC_TOKEN }}"
+          ok=0; fail=0
+          for b in $(git ls-remote --heads "https://github.com/$SRC.git" | awk '{print $2}' | sed 's|refs/heads/||'); do
+            if [ -n "${{ github.event.inputs.branches }}" ]; then
+              case "$b" in ${{ github.event.inputs.branches }}) ;; *) continue;; esac
+            fi
+            if git push "https://x-access-token:$PAT@github.com/$DST.git" "+refs/heads/$b:refs/heads/$b" --force >/dev/null 2>&1; then
+              echo "pushed $b"; ok=$((ok+1))
+            else
+              echo "SKIP $b"; fail=$((fail+1))
+            fi
+          done
+          echo "RESULT pushed=$ok skipped=$fail"
+          git ls-remote "https://x-access-token:$PAT@github.com/$DST.git" | grep refs/heads
